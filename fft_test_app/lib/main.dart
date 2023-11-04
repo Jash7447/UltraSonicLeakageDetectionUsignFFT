@@ -1,78 +1,39 @@
-import 'dart:io';
-import 'package:charts_flutter/flutter.dart' as charts;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:csv/csv.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:fftea/fftea.dart';
+import 'package:usld/screens/fft_imaging.dart';
+import 'package:usld/screens/live_image.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  Future<List<List<dynamic>>> readCSV() async {
-    String csvData =
-        await rootBundle.loadString('assets/sine_wave_samples.csv');
-    List<List<dynamic>> csvTable = CsvToListConverter().convert(csvData);
-    print(csvTable);
-    return csvTable;
-  }
+  const MyApp({super.key});
 
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('FFT Plot'),
-        ),
-        body: FutureBuilder<List<List<dynamic>>>(
-          future: readCSV(),
-          builder: (BuildContext context,
-              AsyncSnapshot<List<List<dynamic>>> snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              List<dynamic> time = [];
-              List<dynamic> amplitude = [];
-              if (snapshot.data != null) {
-                for (var row in snapshot.data!) {
-                  time.add(row[0]); // Assuming 'Time' is the first column
-                  amplitude
-                      .add(row[1]); // Assuming 'Amplitude' is the second column
-                }
-              } else {
-                return Text('No data');
-              }
-
-              // Perform the FFT
-              int N = time.length; // Number of data points
-              double Fs = 1 / (time[1] - time[0]); // Sampling frequency
-
-              // Create an FFT object
-              final fft = FFT(N);
-
-              // Perform the FFT on the amplitude data
-              final freq =
-                  fft.realFft(amplitude.map((x) => x as double).toList());
-
-              // Convert the FFT result into a list of charts.Series
-              List<charts.Series<dynamic, num>> seriesList = [
-                charts.Series<dynamic, num>(
-                  id: 'Freq',
-                  colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
-                  domainFn: (item, _) => item.real,
-                  measureFn: (item, _) => item.imaginary,
-                  data: freq,
-                )
-              ];
-
-              // Plot the waveform and FFT result side by side
-              return charts.LineChart(seriesList);
-            } else {
-              return CircularProgressIndicator();
-            }
-          },
-        ),
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        // This is the theme of your application.
+        //
+        // TRY THIS: Try running your application with "flutter run". You'll see
+        // the application has a blue toolbar. Then, without quitting the app,
+        // try changing the seedColor in the colorScheme below to Colors.green
+        // and then invoke "hot reload" (save your changes or press the "hot
+        // reload" button in a Flutter-supported IDE, or press "r" if you used
+        // the command line to start the app).
+        //
+        // Notice that the counter didn't reset back to zero; the application
+        // state is not lost during the reload. To reset the state, use hot
+        // restart instead.
+        //
+        // This works for code too, not just values: Most code changes can be
+        // tested with just a hot reload.
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
+      home: const FftImaging(),
     );
   }
 }
