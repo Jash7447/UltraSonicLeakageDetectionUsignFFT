@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:fftea/fftea.dart';
+import 'dart:typed_data';
 
 class FftImaging extends StatefulWidget {
   const FftImaging({super.key});
@@ -82,7 +84,7 @@ class _FftImagingState extends State<FftImaging> {
         body: Column(
           children: [
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.8,
+              height: MediaQuery.of(context).size.height * 0.1,
               child: controller == null
                   ? const Center(child: Text("Loading Camera..."))
                   : !controller!.value.isInitialized
@@ -94,7 +96,7 @@ class _FftImagingState extends State<FftImaging> {
                           child: CameraPreview(controller!)),
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.2,
+              height: MediaQuery.of(context).size.height * 0.9,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: const BoxDecoration(
@@ -403,34 +405,89 @@ class _FftImagingState extends State<FftImaging> {
                         -2.544846021,
                         -2.392089689
                       ];
-                      // print(snapshot.data);
-                      // if (snapshot.data != null) {
-                      // for (var row in snapshot.data!) {
-                      //   time.add(double.parse(row[0]
-                      //       .toString())); // Assuming 'Time' is the first column
-                      //   amplitude.add(double.parse(row[1]
-                      //       .toString())); // Assuming 'Amplitude' is the second column
-                      // }
 
-                      // Perform the FFT
                       FFT fft = FFT(amplitude.length);
-                      final freq = fft.realFft(amplitude);
+                      final fft_result = fft.realFft(amplitude);
+                      Float64x2List fftResult = fft_result;
+                      int N = fftResult.length;
+                      int halfofN = (fftResult.length / 2).round();
+                      Float64x2List positiveFrequencies =
+                          fftResult.sublist(0, halfofN);
 
-                      // Convert the FFT output to a format suitable for fl_chart
-                      List<FlSpot> spots = freq
-                          .map((value) => FlSpot(value.x, value.y))
+                      List<Float64x2> magnitudeList =
+                          List<Float64x2>.generate(halfofN, (int index) {
+                        double real = positiveFrequencies[index].x;
+                        double imag = positiveFrequencies[index].y;
+                        double absValue = sqrt(real * real + imag * imag) / 500;
+                        return Float64x2(absValue, absValue);
+                      });
+
+                      Float64x2List magnitude =
+                          Float64x2List.fromList(magnitudeList);
+
+                      List<double> absValues_magnitude = magnitudeList
+                          .map((value) =>
+                              value.x) // Assuming x and y are the same
                           .toList();
 
-                      // Plot the waveform and FFT result side by side
+                      int length_time = time.length;
+                      double Fs = 1 / (time[1] - time[0]);
+                      List<double> frequencies = List.generate(
+                          length_time, (index) => index * Fs / length_time);
+                      int middle = (frequencies.length / 2).round();
+                      List<double> half_freq = frequencies.sublist(0, middle);
+
+                      Float64x2List freq_result = fft_result;
+                      List<FlSpot> spots = half_freq
+                          .asMap()
+                          .entries
+                          .map((entry) => FlSpot(
+                              entry.value, absValues_magnitude[entry.key]))
+                          .toList();
+
+                      // print("N");
+                      // print(fftResult.length);
+                      // print(halfofN);
+                      // print("magnitude");
+                      // print(magnitude);
+                      // print("finish");
+                      // Print the frequency
+                      // print(fft_result);
+                      // print("object\n");
+                      // print(half_freq);
+                      // print("abs magnitude");
+                      // print(absValues_magnitude);
+                      // print(absValues_magnitude.length);
+                      // print("half freq");
+                      // print(half_freq.length);
+
+                      //plot
                       return LineChart(
                         LineChartData(
+                          minX: 0, // Your min value for x-axis
+                          maxX: 500, // Your max value for x-axis
+                          minY: 0, // Your min value for y-axis
+                          maxY: 0.2, // Your max value for y-axis
                           gridData: const FlGridData(show: false),
-                          titlesData: const FlTitlesData(show: false),
+                          titlesData: const FlTitlesData(
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 22,
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 28,
+                              ),
+                            ),
+                          ),
                           borderData: FlBorderData(show: false),
                           lineBarsData: [
                             LineChartBarData(
                               spots: spots,
-                              isCurved: true,
+                              isCurved: false,
                               dotData: const FlDotData(show: false),
                               belowBarData: BarAreaData(show: false),
                             )
