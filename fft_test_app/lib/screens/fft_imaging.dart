@@ -84,7 +84,7 @@ class _FftImagingState extends State<FftImaging> {
         body: Column(
           children: [
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.1,
+              height: MediaQuery.of(context).size.height * 0.5,
               child: controller == null
                   ? const Center(child: Text("Loading Camera..."))
                   : !controller!.value.isInitialized
@@ -96,7 +96,7 @@ class _FftImagingState extends State<FftImaging> {
                           child: CameraPreview(controller!)),
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.9,
+              height: MediaQuery.of(context).size.height * 0.5,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: const BoxDecoration(
