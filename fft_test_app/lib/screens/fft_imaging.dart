@@ -80,7 +80,7 @@ class _FftImagingState extends State<FftImaging> {
     final random = Random();
     final buffer = StringBuffer();
     for (int i = 0; i < n; i++) {
-      buffer.writeln('${random.nextInt(10) + random.nextDouble()} ');
+      buffer.writeln('${random.nextInt(20) + random.nextDouble()} ');
     }
     return buffer.toString();
   }
@@ -266,7 +266,7 @@ class _FftImagingState extends State<FftImaging> {
                       -2.392089689
                     ];
 
-                    List<String> lines = generateRandomData(10000).split('\n');
+                    List<String> lines = generateRandomData(100000).split('\n');
                     List<double> numbers = [];
                     // debugPrint(lines.toString());
 
@@ -284,7 +284,7 @@ class _FftImagingState extends State<FftImaging> {
                     // print(numbers);
                     // print("length=" + numbers.length.toString());
 
-                    double interval = 50;
+                    double interval = 1;
                     double currentTime = 0.0;
                     int currentIndex = 0;
 
@@ -294,12 +294,11 @@ class _FftImagingState extends State<FftImaging> {
                             numbers.sublist(currentIndex, currentIndex + 50));
                         currentIndex += 1;
                         currentTime += interval;
-                        await Future.delayed(const Duration(seconds: 2), () {
+                        await Future.delayed(const Duration(seconds: 1), () {
                           // print("object printed");
                           // print(data);
                           FFT fft = FFT(data.length);
-                          final fft_result = fft.realFft(data);
-                          Float64x2List fftResult = fft_result;
+                          final fftResult = fft.realFft(data);
                           int N = fftResult.length;
                           int halfofN = (fftResult.length / 2).round();
                           Float64x2List positiveFrequencies =
@@ -317,34 +316,34 @@ class _FftImagingState extends State<FftImaging> {
                           Float64x2List magnitude =
                               Float64x2List.fromList(magnitudeList);
 
-                          List<double> absValues_magnitude = magnitudeList
+                          List<double> absvaluesMagnitude = magnitudeList
                               .map((value) =>
                                   value.x) // Assuming x and y are the same
                               .toList();
 
-                          int length_time = data.length;
+                          int lengthTime = data.length;
                           double Fs = 1 / 0.001;
                           List<double> frequencies = List.generate(
-                              length_time, (index) => index * Fs / length_time);
+                              lengthTime, (index) => index * Fs / lengthTime);
                           int middle = (frequencies.length / 2).round();
-                          List<double> half_freq =
+                          List<double> halfFreq =
                               frequencies.sublist(0, middle);
 
-                          Float64x2List freq_result = fft_result;
+                          Float64x2List freqResult = fftResult;
                           // debugPrint("FFT: $fft_result");
                           // debugPrint("ABS: $absValues_magnitude");
-                          spots = half_freq
+                          spots = halfFreq
                               .asMap()
                               .entries
                               .map((entry) => FlSpot(
-                                  entry.value, absValues_magnitude[entry.key]))
+                                  entry.value, absvaluesMagnitude[entry.key]))
                               .toList();
                           setState(() {});
                         });
                       }
                       // currentTime = 0;
-                      // myFunction();
-                      // data = List.filled(data.length, 0);
+                      myFunction();
+                      data = List.filled(data.length, 0);
                     }
 
                     myFunction();
@@ -369,7 +368,7 @@ class _FftImagingState extends State<FftImaging> {
                     return LineChart(
                       LineChartData(
                         minX: 0, // Your min value for x-axis
-                        maxX: 10000, // Your max value for x-axis
+                        maxX: 500, // Your max value for x-axis
                         minY: 0, // Your min value for y-axis
                         maxY: 30, // Your max value for y-axis
                         gridData: const FlGridData(show: false),
