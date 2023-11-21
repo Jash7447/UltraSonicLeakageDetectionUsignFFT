@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:usld/screens/fft_imaging.dart';
-import 'package:usld/screens/live_image.dart';
 
 void main() {
   runApp(const MyApp());
