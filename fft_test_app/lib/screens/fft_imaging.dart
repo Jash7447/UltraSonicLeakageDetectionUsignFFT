@@ -21,7 +21,8 @@ class _FftImagingState extends State<FftImaging> {
   UsbPort? _port;
   String _status = "Idle";
   List<Widget> _ports = [];
-  final List<Widget> _serialData = [];
+  String _serialData = "";
+  List<double> numbers = [];
 
   StreamSubscription<String>? _subscription;
   Transaction<String>? _transaction;
@@ -29,8 +30,6 @@ class _FftImagingState extends State<FftImaging> {
   final TextEditingController _textController = TextEditingController();
 
   Future<bool> _connectTo(device) async {
-    _serialData.clear();
-
     if (_subscription != null) {
       _subscription!.cancel();
       _subscription = null;
@@ -66,17 +65,15 @@ class _FftImagingState extends State<FftImaging> {
     await _port!.setDTR(true);
     await _port!.setRTS(true);
     await _port!.setPortParameters(
-        115200, UsbPort.DATABITS_8, UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
+        38400, UsbPort.DATABITS_8, UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
 
-    _transaction = Transaction.stringTerminated(
-        _port!.inputStream as Stream<Uint8List>, Uint8List.fromList([13, 10]));
-
-    _subscription = _transaction!.stream.listen((String line) {
+    _subscription =
+        (_port!.inputStream as Stream<Uint8List>).listen((Uint8List data) {
       setState(() {
-        _serialData.add(Text(line));
-        print("Data: ${_serialData.length}");
+        _serialData += "${String.fromCharCodes(data)} ";
+        // print("Data: ${_serialData.length}");
       });
-    });
+    }) as StreamSubscription<String>?;
 
     setState(() {
       _status = "Connected";
@@ -135,7 +132,7 @@ class _FftImagingState extends State<FftImaging> {
   @override
   void initState() {
     // TODO: implement initState
-    // loadCamera();
+    loadCamera();
     // print("This is a mock print");
     UsbSerial.usbEventStream!.listen((UsbEvent event) {
       _getPorts();
@@ -152,18 +149,6 @@ class _FftImagingState extends State<FftImaging> {
       home: Scaffold(
         body: Column(
           children: [
-            // SizedBox(
-            //   height: MediaQuery.of(context).size.height * 0.4, //camera ration
-            //   child: controller == null
-            //       ? const Center(child: Text("Loading Camera..."))
-            //       : !controller!.value.isInitialized
-            //           ? const Center(
-            //               child: CircularProgressIndicator(),
-            //             )
-            //           : AspectRatio(
-            //               aspectRatio: controller!.value.aspectRatio,
-            //               child: CameraPreview(controller!)),
-            // ),
             SizedBox(
               height: MediaQuery.of(context).size.height * 1,
               child: Container(
@@ -176,7 +161,7 @@ class _FftImagingState extends State<FftImaging> {
                     // if (snapshot.connectionState == ConnectionState.done) {
                     // List<String> lines = generateRandomData(1000).split(' ');
                     List<String> lines = _serialData.toString().split(" ");
-                    List<double> numbers = [];
+                    numbers = [];
                     // debugPrint(lines.toString());
                     for (String line in lines) {
                       List<String> strings = line.trim().split(RegExp(r'\s+'));
@@ -188,145 +173,137 @@ class _FftImagingState extends State<FftImaging> {
                         }
                       }
                     }
+                    if (_status == "Connected" && numbers.isNotEmpty) {
+                      FFT fft = FFT(numbers.length);
+                      final fftResult = fft.realFft(numbers);
+                      int N = fftResult.length;
+                      int halfofN = (fftResult.length / 2).round();
+                      Float64x2List positiveFrequencies =
+                          fftResult.sublist(0, halfofN);
 
-                    // print(numbers);
-                    // print("length=" + numbers.length.toString());
+                      List<Float64x2> magnitudeList =
+                          List<Float64x2>.generate(halfofN, (int index) {
+                        double real = positiveFrequencies[index].x;
+                        double imag = positiveFrequencies[index].y;
+                        double absValue = sqrt(real * real + imag * imag) / 500;
+                        return Float64x2(absValue, absValue);
+                      });
 
-                    double interval = 1;
-                    double currentTime = 0.0;
-                    int currentIndex = 0;
+                      Float64x2List magnitude =
+                          Float64x2List.fromList(magnitudeList);
 
-                    Future<void> myFunction() async {
-                      while (currentTime < numbers.length) {
-                        data.addAll(
-                            numbers.sublist(currentIndex, currentIndex + 50));
-                        currentIndex += 1;
-                        currentTime += interval;
-                        await Future.delayed(const Duration(seconds: 1), () {
-                          // print("object printed");
-                          // print(data);
-                          FFT fft = FFT(data.length);
-                          final fftResult = fft.realFft(data);
-                          int N = fftResult.length;
-                          int halfofN = (fftResult.length / 2).round();
-                          Float64x2List positiveFrequencies =
-                              fftResult.sublist(0, halfofN);
+                      List<double> absvaluesMagnitude = magnitudeList
+                          .map((value) =>
+                              value.x) // Assuming x and y are the same
+                          .toList();
 
-                          List<Float64x2> magnitudeList =
-                              List<Float64x2>.generate(halfofN, (int index) {
-                            double real = positiveFrequencies[index].x;
-                            double imag = positiveFrequencies[index].y;
-                            double absValue =
-                                sqrt(real * real + imag * imag) / 500;
-                            return Float64x2(absValue, absValue);
-                          });
+                      int lengthTime = numbers.length;
+                      double Fs = 1 / 0.001;
+                      List<double> frequencies = List.generate(
+                          lengthTime, (index) => index * Fs / lengthTime);
+                      int middle = (frequencies.length / 2).round();
+                      List<double> halfFreq = frequencies.sublist(0, middle);
 
-                          Float64x2List magnitude =
-                              Float64x2List.fromList(magnitudeList);
-
-                          List<double> absvaluesMagnitude = magnitudeList
-                              .map((value) =>
-                                  value.x) // Assuming x and y are the same
-                              .toList();
-
-                          int lengthTime = data.length;
-                          double Fs = 1 / 0.001;
-                          List<double> frequencies = List.generate(
-                              lengthTime, (index) => index * Fs / lengthTime);
-                          int middle = (frequencies.length / 2).round();
-                          List<double> halfFreq =
-                              frequencies.sublist(0, middle);
-
-                          Float64x2List freqResult = fftResult;
-                          // debugPrint("FFT: $fft_result");
-                          // debugPrint("ABS: $absValues_magnitude");
-                          spots = halfFreq
-                              .asMap()
-                              .entries
-                              .map((entry) => FlSpot(
-                                  entry.value, absvaluesMagnitude[entry.key]))
-                              .toList();
-                          setState(() {});
-                        });
-                      }
-                      // currentTime = 0;
-                      // myFunction();
-                      // data = List.filled(data.length, 0);
+                      Float64x2List freqResult = fftResult;
+                      // debugPrint("FFT: $fft_result");
+                      // debugPrint("ABS: $absValues_magnitude");
+                      spots = halfFreq
+                          .asMap()
+                          .entries
+                          .map((entry) => FlSpot(
+                              entry.value, absvaluesMagnitude[entry.key]))
+                          .toList();
+                      //plot
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height *
+                                0.4, //camera ration
+                            child: controller == null
+                                ? const Center(child: Text("Loading Camera..."))
+                                : !controller!.value.isInitialized
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : AspectRatio(
+                                        aspectRatio:
+                                            controller!.value.aspectRatio,
+                                        child: CameraPreview(controller!)),
+                          ),
+                          LineChart(
+                            LineChartData(
+                              minX: 0, // Your min value for x-axis
+                              maxX: 500, // Your max value for x-axis
+                              minY: 0, // Your min value for y-axis
+                              maxY: 30, // Your max value for y-axis
+                              gridData: const FlGridData(show: false),
+                              titlesData: const FlTitlesData(
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 22,
+                                  ),
+                                ),
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 28,
+                                  ),
+                                ),
+                              ),
+                              borderData: FlBorderData(show: false),
+                              lineBarsData: [
+                                LineChartBarData(
+                                  spots: spots,
+                                  isCurved: false,
+                                  dotData: const FlDotData(show: false),
+                                  belowBarData: BarAreaData(show: false),
+                                )
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Center(
+                          child: Column(children: <Widget>[
+                        Text(
+                            _ports.isNotEmpty
+                                ? "Available Serial Ports"
+                                : "No serial devices available",
+                            style: Theme.of(context).textTheme.titleLarge),
+                        ..._ports,
+                        Text('Status: $_status\n'),
+                        Text('info: ${_port.toString()}\n'),
+                        // ListTile(
+                        //   title: TextField(
+                        //     controller: _textController,
+                        //     decoration: const InputDecoration(
+                        //       border: OutlineInputBorder(),
+                        //       labelText: 'Text To Send',
+                        //     ),
+                        //   ),
+                        //   trailing: ElevatedButton(
+                        //     onPressed: _port == null
+                        //         ? null
+                        //         : () async {
+                        //             if (_port == null) {
+                        //               return;
+                        //             }
+                        //             String data = "${_textController.text}\r\n";
+                        //             await _port!.write(
+                        //                 Uint8List.fromList(data.codeUnits));
+                        //             _textController.text = "";
+                        //           },
+                        //     child: const Text("Send"),
+                        //   ),
+                        // ),
+                        // Text("Result Data",
+                        //     style: Theme.of(context).textTheme.titleLarge),
+                        Center(child: Text(numbers.length.toString())),
+                        Text(_serialData), //this is the data
+                      ]));
                     }
-
-                    myFunction();
-
-                    //plot
-                    // return LineChart(
-                    //   LineChartData(
-                    //     minX: 0, // Your min value for x-axis
-                    //     maxX: 500, // Your max value for x-axis
-                    //     minY: 0, // Your min value for y-axis
-                    //     maxY: 30, // Your max value for y-axis
-                    //     gridData: const FlGridData(show: false),
-                    //     titlesData: const FlTitlesData(
-                    //       bottomTitles: AxisTitles(
-                    //         sideTitles: SideTitles(
-                    //           showTitles: true,
-                    //           reservedSize: 22,
-                    //         ),
-                    //       ),
-                    //       leftTitles: AxisTitles(
-                    //         sideTitles: SideTitles(
-                    //           showTitles: true,
-                    //           reservedSize: 28,
-                    //         ),
-                    //       ),
-                    //     ),
-                    //     borderData: FlBorderData(show: false),
-                    //     lineBarsData: [
-                    //       LineChartBarData(
-                    //         spots: spots,
-                    //         isCurved: false,
-                    //         dotData: const FlDotData(show: false),
-                    //         belowBarData: BarAreaData(show: false),
-                    //       )
-                    //     ],
-                    //   ),
-                    // );
-
-                    return Center(
-                        child: Column(children: <Widget>[
-                      Text(
-                          _ports.isNotEmpty
-                              ? "Available Serial Ports"
-                              : "No serial devices available",
-                          style: Theme.of(context).textTheme.titleLarge),
-                      ..._ports,
-                      Text('Status: $_status\n'),
-                      Text('info: ${_port.toString()}\n'),
-                      // ListTile(
-                      //   title: TextField(
-                      //     controller: _textController,
-                      //     decoration: const InputDecoration(
-                      //       border: OutlineInputBorder(),
-                      //       labelText: 'Text To Send',
-                      //     ),
-                      //   ),
-                      //   trailing: ElevatedButton(
-                      //     onPressed: _port == null
-                      //         ? null
-                      //         : () async {
-                      //             if (_port == null) {
-                      //               return;
-                      //             }
-                      //             String data = "${_textController.text}\r\n";
-                      //             await _port!.write(
-                      //                 Uint8List.fromList(data.codeUnits));
-                      //             _textController.text = "";
-                      //           },
-                      //     child: const Text("Send"),
-                      //   ),
-                      // ),
-                      Text("Result Data",
-                          style: Theme.of(context).textTheme.titleLarge),
-                      ..._serialData,
-                    ]));
                   },
                 ),
               ),
