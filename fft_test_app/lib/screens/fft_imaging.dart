@@ -181,56 +181,62 @@ class _FftImagingState extends State<FftImaging> {
                       }
                     }
 
-                    if (_status == "Connected" && numbers.length > 200) {
-                      FFT fft = FFT(numbers.length);
-                      final fftResult = fft.realFft(numbers);
-                      int N = fftResult.length;
-                      int halfofN = (N / 2).round();
-                      Float64x2List positiveFrequencies =
-                          fftResult.sublist(0, halfofN);
+                    if (_status == "Connected") {
+                      if (numbers.length > 100) {
+                        FFT fft = FFT(numbers.length);
+                        final fftResult = fft.realFft(numbers);
+                        int N = fftResult.length;
+                        int halfofN = (N / 2).round();
+                        Float64x2List positiveFrequencies =
+                            fftResult.sublist(0, halfofN);
 
-                      List<Float64x2> magnitudeList =
-                          List<Float64x2>.generate(halfofN, (int index) {
-                        double real = positiveFrequencies[index].x;
-                        double imag = positiveFrequencies[index].y;
-                        if (real.isNaN || imag.isNaN) {
-                          return Float64x2(0, 0); // or any other default value
+                        List<Float64x2> magnitudeList =
+                            List<Float64x2>.generate(halfofN, (int index) {
+                          double real = positiveFrequencies[index].x;
+                          double imag = positiveFrequencies[index].y;
+                          if (real.isNaN || imag.isNaN) {
+                            return Float64x2(
+                                0, 0); // or any other default value
+                          }
+                          double absValue =
+                              sqrt(real * real + imag * imag) / 500;
+                          return Float64x2(absValue, absValue);
+                        });
+
+                        // Float64x2List magnitude =
+                        //     Float64x2List.fromList(magnitudeList);
+
+                        List<double> absvaluesMagnitude = magnitudeList
+                            .map((value) =>
+                                value.x) // Assuming x and y are the same
+                            .toList();
+
+                        int lengthTime = numbers.length;
+                        double Fs = 1 / 0.005;
+                        List<double> frequencies = List.generate(
+                            lengthTime, (index) => index * Fs / lengthTime);
+                        double middleDouble = frequencies.length / 2;
+                        int middle;
+                        if (middleDouble.isInfinite || middleDouble.isNaN) {
+                          middle = 0;
+                        } else {
+                          middle = middleDouble.round();
                         }
-                        double absValue = sqrt(real * real + imag * imag) / 500;
-                        return Float64x2(absValue, absValue);
-                      });
 
-                      // Float64x2List magnitude =
-                      //     Float64x2List.fromList(magnitudeList);
+                        List<double> halfFreq = frequencies.sublist(0, middle);
 
-                      List<double> absvaluesMagnitude = magnitudeList
-                          .map((value) =>
-                              value.x) // Assuming x and y are the same
-                          .toList();
-
-                      int lengthTime = numbers.length;
-                      double Fs = 1 / 0.005;
-                      List<double> frequencies = List.generate(
-                          lengthTime, (index) => index * Fs / lengthTime);
-                      double middleDouble = frequencies.length / 2;
-                      int middle;
-                      if (middleDouble.isInfinite || middleDouble.isNaN) {
-                        middle = 0;
+                        // Float64x2List freqResult = fftResult;
+                        // debugPrint("FFT: $fft_result");
+                        // debugPrint("ABS: $absValues_magnitude");
+                        spots = halfFreq
+                            .asMap()
+                            .entries
+                            .map((entry) => FlSpot(
+                                entry.value, absvaluesMagnitude[entry.key]))
+                            .toList();
                       } else {
-                        middle = middleDouble.round();
+                        spots = [];
                       }
-
-                      List<double> halfFreq = frequencies.sublist(0, middle);
-
-                      // Float64x2List freqResult = fftResult;
-                      // debugPrint("FFT: $fft_result");
-                      // debugPrint("ABS: $absValues_magnitude");
-                      spots = halfFreq
-                          .asMap()
-                          .entries
-                          .map((entry) => FlSpot(
-                              entry.value.toInt()*0.1, absvaluesMagnitude[entry.key.toInt()]))
-                          .toList();
 
                       // return Center(
                       //   child: Text(spots.join(" ").toString()),
@@ -252,36 +258,39 @@ class _FftImagingState extends State<FftImaging> {
                           //                   controller!.value.aspectRatio,
                           //               child: CameraPreview(controller!)),
                           // ),
-                          LineChart(
-                            LineChartData(
-                              minX: 0, // Your min value for x-axis
-                              maxX: 500, // Your max value for x-axis
-                              minY: 0, // Your min value for y-axis
-                              maxY: 30, // Your max value for y-axis
-                              gridData: const FlGridData(show: false),
-                              titlesData: const FlTitlesData(
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 22,
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.5,
+                            child: LineChart(
+                              LineChartData(
+                                minX: 0, // Your min value for x-axis
+                                maxX: 10, // Your max value for x-axis
+                                minY: 0, // Your min value for y-axis
+                                maxY: 5000, // Your max value for y-axis
+                                gridData: const FlGridData(show: false),
+                                titlesData: const FlTitlesData(
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 22,
+                                    ),
+                                  ),
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 28,
+                                    ),
                                   ),
                                 ),
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 28,
-                                  ),
-                                ),
+                                borderData: FlBorderData(show: false),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: spots,
+                                    isCurved: false,
+                                    dotData: const FlDotData(show: false),
+                                    belowBarData: BarAreaData(show: false),
+                                  )
+                                ],
                               ),
-                              borderData: FlBorderData(show: false),
-                              lineBarsData: [
-                                LineChartBarData(
-                                  spots: spots,
-                                  isCurved: false,
-                                  dotData: const FlDotData(show: false),
-                                  belowBarData: BarAreaData(show: false),
-                                )
-                              ],
                             ),
                           ),
                         ],
