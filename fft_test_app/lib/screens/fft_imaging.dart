@@ -166,22 +166,26 @@ class _FftImagingState extends State<FftImaging> {
                     List<String> lines = _serialData.toString().split("\n");
                     numbers = [];
                     // debugPrint(lines.toString());
+                    _serialData = "";
                     for (String line in lines) {
                       List<String> strings = line.trim().split(RegExp(r'\s+'));
+                      _serialData += "$strings ";
                       for (String s in strings) {
                         if (double.tryParse(s) != null) {
                           try {
                             numbers.add(double.parse(s));
-                          } catch (e) {}
+                          } catch (e) {
+                            numbers.add(double.parse("0.0"));
+                          }
                         }
                       }
                     }
-                    _serialData = "";
-                    if (numbers.length > 200 && _status == "Connected") {
+
+                    if (_status == "Connected" && numbers.length > 200) {
                       FFT fft = FFT(numbers.length);
                       final fftResult = fft.realFft(numbers);
-                      // int N = fftResult.length;
-                      int halfofN = (fftResult.length / 2).round();
+                      int N = fftResult.length;
+                      int halfofN = (N / 2).round();
                       Float64x2List positiveFrequencies =
                           fftResult.sublist(0, halfofN);
 
@@ -205,10 +209,17 @@ class _FftImagingState extends State<FftImaging> {
                           .toList();
 
                       int lengthTime = numbers.length;
-                      double Fs = 1 / 0.001;
+                      double Fs = 1 / 0.005;
                       List<double> frequencies = List.generate(
                           lengthTime, (index) => index * Fs / lengthTime);
-                      int middle = (frequencies.length / 2).round();
+                      double middleDouble = frequencies.length / 2;
+                      int middle;
+                      if (middleDouble.isInfinite || middleDouble.isNaN) {
+                        middle = 0;
+                      } else {
+                        middle = middleDouble.round();
+                      }
+
                       List<double> halfFreq = frequencies.sublist(0, middle);
 
                       // Float64x2List freqResult = fftResult;
@@ -218,9 +229,13 @@ class _FftImagingState extends State<FftImaging> {
                           .asMap()
                           .entries
                           .map((entry) => FlSpot(
-                              entry.value, absvaluesMagnitude[entry.key]))
+                              entry.value.toInt()*0.1, absvaluesMagnitude[entry.key.toInt()]))
                           .toList();
-                      //plot
+
+                      // return Center(
+                      //   child: Text(spots.join(" ").toString()),
+                      // );
+                      // plot
                       return Column(
                         children: [
                           // SizedBox(
@@ -273,43 +288,45 @@ class _FftImagingState extends State<FftImaging> {
                       );
                     } else {
                       return Center(
-                          child: Column(children: <Widget>[
-                        Text(
-                            _ports.isNotEmpty
-                                ? "Available Serial Ports"
-                                : "No serial devices available",
-                            style: Theme.of(context).textTheme.titleLarge),
-                        ..._ports,
-                        Text('Status: $_status\n'),
-                        Text('info: ${_port.toString()}\n'),
-                        // ListTile(
-                        //   title: TextField(
-                        //     controller: _textController,
-                        //     decoration: const InputDecoration(
-                        //       border: OutlineInputBorder(),
-                        //       labelText: 'Text To Send',
-                        //     ),
-                        //   ),
-                        //   trailing: ElevatedButton(
-                        //     onPressed: _port == null
-                        //         ? null
-                        //         : () async {
-                        //             if (_port == null) {
-                        //               return;
-                        //             }
-                        //             String data = "${_textController.text}\r\n";
-                        //             await _port!.write(
-                        //                 Uint8List.fromList(data.codeUnits));
-                        //             _textController.text = "";
-                        //           },
-                        //     child: const Text("Send"),
-                        //   ),
-                        // ),
-                        // Text("Result Data",
-                        //     style: Theme.of(context).textTheme.titleLarge),
-                        Center(child: Text(numbers.length.toString())),
-                        Text(_serialData), //this is the data
-                      ]));
+                          child: SingleChildScrollView(
+                        child: Column(children: <Widget>[
+                          Text(
+                              _ports.isNotEmpty
+                                  ? "Available Serial Ports"
+                                  : "No serial devices available",
+                              style: Theme.of(context).textTheme.titleLarge),
+                          ..._ports,
+                          Text('Status: $_status\n'),
+                          Text('info: ${_port.toString()}\n'),
+                          // ListTile(
+                          //   title: TextField(
+                          //     controller: _textController,
+                          //     decoration: const InputDecoration(
+                          //       border: OutlineInputBorder(),
+                          //       labelText: 'Text To Send',
+                          //     ),
+                          //   ),
+                          //   trailing: ElevatedButton(
+                          //     onPressed: _port == null
+                          //         ? null
+                          //         : () async {
+                          //             if (_port == null) {
+                          //               return;
+                          //             }
+                          //             String data = "${_textController.text}\r\n";
+                          //             await _port!.write(
+                          //                 Uint8List.fromList(data.codeUnits));
+                          //             _textController.text = "";
+                          //           },
+                          //     child: const Text("Send"),
+                          //   ),
+                          // ),
+                          // Text("Result Data",
+                          //     style: Theme.of(context).textTheme.titleLarge),
+                          Center(child: Text(numbers.join(" ").toString())),
+                          // Text(_serialData), //this is the data
+                        ]),
+                      ));
                     }
                   },
                 ),
