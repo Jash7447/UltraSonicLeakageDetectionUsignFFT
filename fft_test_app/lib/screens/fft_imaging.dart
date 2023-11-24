@@ -23,6 +23,7 @@ class _FftImagingState extends State<FftImaging> {
   List<Widget> _ports = [];
   String _serialData = "";
   List<double> numbers = [];
+  List<FlSpot> prevSpots = [];
 
   StreamSubscription<String>? _subscription;
   Transaction<String>? _transaction;
@@ -71,10 +72,11 @@ class _FftImagingState extends State<FftImaging> {
         _port!.inputStream as Stream<Uint8List>, Uint8List.fromList([0]));
 
     _subscription = _transaction!.stream.listen((String line) {
-      setState(() {
-        _serialData += line;
-        // print("Data: ${_serialData.length}");
-      });
+      _serialData += line;
+      if (_serialData.length > 1000) {
+        setState(() {});
+      }
+      // debugPrint(line);
     });
 
     setState(() {
@@ -135,7 +137,7 @@ class _FftImagingState extends State<FftImaging> {
   @override
   void initState() {
     // TODO: implement initState
-    loadCamera();
+    // loadCamera();
     // print("This is a mock print");
     UsbSerial.usbEventStream!.listen((UsbEvent event) {
       _getPorts();
@@ -166,7 +168,6 @@ class _FftImagingState extends State<FftImaging> {
                     List<String> lines = _serialData.toString().split("\n");
                     numbers = [];
                     // debugPrint(lines.toString());
-                    _serialData = "";
                     for (String line in lines) {
                       List<String> strings = line.trim().split(RegExp(r'\s+'));
                       _serialData += "$strings ";
@@ -174,17 +175,18 @@ class _FftImagingState extends State<FftImaging> {
                         if (double.tryParse(s) != null) {
                           try {
                             numbers.add(double.parse(s));
-                          } catch (e) {
-                            numbers.add(double.parse("0.0"));
-                          }
+                          } catch (e) {}
                         }
                       }
                     }
-
+                    if (_serialData.length > 25000) {
+                      _serialData = "";
+                    }
                     if (_status == "Connected") {
                       if (numbers.length > 100) {
                         FFT fft = FFT(numbers.length);
                         final fftResult = fft.realFft(numbers);
+                        // debugPrint(fftResult.join(" ").toString());
                         int N = fftResult.length;
                         int halfofN = (N / 2).round();
                         Float64x2List positiveFrequencies =
@@ -194,10 +196,10 @@ class _FftImagingState extends State<FftImaging> {
                             List<Float64x2>.generate(halfofN, (int index) {
                           double real = positiveFrequencies[index].x;
                           double imag = positiveFrequencies[index].y;
-                          if (real.isNaN || imag.isNaN) {
-                            return Float64x2(
-                                0, 0); // or any other default value
-                          }
+                          // if (real.isNaN || imag.isNaN) {
+                          //   return Float64x2(
+                          //       0, 0); // or any other default value
+                          // }
                           double absValue =
                               sqrt(real * real + imag * imag) / 500;
                           return Float64x2(absValue, absValue);
@@ -210,18 +212,18 @@ class _FftImagingState extends State<FftImaging> {
                             .map((value) =>
                                 value.x) // Assuming x and y are the same
                             .toList();
-
+                        debugPrint(absvaluesMagnitude.join(" ").toString());
                         int lengthTime = numbers.length;
-                        double Fs = 1 / 0.005;
+                        double Fs = 1024;
                         List<double> frequencies = List.generate(
                             lengthTime, (index) => index * Fs / lengthTime);
                         double middleDouble = frequencies.length / 2;
                         int middle;
-                        if (middleDouble.isInfinite || middleDouble.isNaN) {
-                          middle = 0;
-                        } else {
-                          middle = middleDouble.round();
-                        }
+                        middle = middleDouble.round();
+                        // if (middleDouble.isInfinite || middleDouble.isNaN) {
+                        //   middle = 0;
+                        // } else {
+                        // }
 
                         List<double> halfFreq = frequencies.sublist(0, middle);
 
@@ -234,8 +236,13 @@ class _FftImagingState extends State<FftImaging> {
                             .map((entry) => FlSpot(
                                 entry.value, absvaluesMagnitude[entry.key]))
                             .toList();
+                        prevSpots = spots;
                       } else {
-                        spots = [];
+                        if (prevSpots.isNotEmpty) {
+                          spots = prevSpots;
+                        } else {
+                          spots = [];
+                        }
                       }
 
                       // return Center(
@@ -243,10 +250,11 @@ class _FftImagingState extends State<FftImaging> {
                       // );
                       // plot
                       return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // SizedBox(
                           //   height: MediaQuery.of(context).size.height *
-                          //       0.4, //camera ration
+                          //       0.2, //camera ration
                           //   child: controller == null
                           //       ? const Center(child: Text("Loading Camera..."))
                           //       : !controller!.value.isInitialized
@@ -259,13 +267,13 @@ class _FftImagingState extends State<FftImaging> {
                           //               child: CameraPreview(controller!)),
                           // ),
                           SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.5,
+                            height: MediaQuery.of(context).size.height * 0.9,
                             child: LineChart(
                               LineChartData(
                                 minX: 0, // Your min value for x-axis
-                                maxX: 10, // Your max value for x-axis
+                                maxX: 50, // Your max value for x-axis
                                 minY: 0, // Your min value for y-axis
-                                maxY: 5000, // Your max value for y-axis
+                                maxY: 200, // Your max value for y-axis
                                 gridData: const FlGridData(show: false),
                                 titlesData: const FlTitlesData(
                                   bottomTitles: AxisTitles(
