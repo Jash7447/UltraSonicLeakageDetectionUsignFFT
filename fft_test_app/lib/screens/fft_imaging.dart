@@ -67,17 +67,20 @@ class _FftImagingState extends State<FftImaging> {
     await _port!.setPortParameters(
         38400, UsbPort.DATABITS_8, UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
 
-    _subscription =
-        (_port!.inputStream as Stream<Uint8List>).listen((Uint8List data) {
+    _transaction = Transaction.stringTerminated(
+        _port!.inputStream as Stream<Uint8List>, Uint8List.fromList([0]));
+
+    _subscription = _transaction!.stream.listen((String line) {
       setState(() {
-        _serialData += "${String.fromCharCodes(data)} ";
+        _serialData += line;
         // print("Data: ${_serialData.length}");
       });
-    }) as StreamSubscription<String>?;
+    });
 
     setState(() {
       _status = "Connected";
     });
+
     return true;
   }
 
@@ -160,23 +163,24 @@ class _FftImagingState extends State<FftImaging> {
                   builder: (context) {
                     // if (snapshot.connectionState == ConnectionState.done) {
                     // List<String> lines = generateRandomData(1000).split(' ');
-                    List<String> lines = _serialData.toString().split(" ");
+                    List<String> lines = _serialData.toString().split("\n");
                     numbers = [];
                     // debugPrint(lines.toString());
                     for (String line in lines) {
                       List<String> strings = line.trim().split(RegExp(r'\s+'));
                       for (String s in strings) {
-                        try {
-                          numbers.add(double.parse(s));
-                        } catch (e) {
-                          print('Could not parse "$s" as a double.');
+                        if (double.tryParse(s) != null) {
+                          try {
+                            numbers.add(double.parse(s));
+                          } catch (e) {}
                         }
                       }
                     }
-                    if (_status == "Connected" && numbers.isNotEmpty) {
+                    _serialData = "";
+                    if (numbers.length > 200 && _status == "Connected") {
                       FFT fft = FFT(numbers.length);
                       final fftResult = fft.realFft(numbers);
-                      int N = fftResult.length;
+                      // int N = fftResult.length;
                       int halfofN = (fftResult.length / 2).round();
                       Float64x2List positiveFrequencies =
                           fftResult.sublist(0, halfofN);
@@ -185,12 +189,15 @@ class _FftImagingState extends State<FftImaging> {
                           List<Float64x2>.generate(halfofN, (int index) {
                         double real = positiveFrequencies[index].x;
                         double imag = positiveFrequencies[index].y;
+                        if (real.isNaN || imag.isNaN) {
+                          return Float64x2(0, 0); // or any other default value
+                        }
                         double absValue = sqrt(real * real + imag * imag) / 500;
                         return Float64x2(absValue, absValue);
                       });
 
-                      Float64x2List magnitude =
-                          Float64x2List.fromList(magnitudeList);
+                      // Float64x2List magnitude =
+                      //     Float64x2List.fromList(magnitudeList);
 
                       List<double> absvaluesMagnitude = magnitudeList
                           .map((value) =>
@@ -204,7 +211,7 @@ class _FftImagingState extends State<FftImaging> {
                       int middle = (frequencies.length / 2).round();
                       List<double> halfFreq = frequencies.sublist(0, middle);
 
-                      Float64x2List freqResult = fftResult;
+                      // Float64x2List freqResult = fftResult;
                       // debugPrint("FFT: $fft_result");
                       // debugPrint("ABS: $absValues_magnitude");
                       spots = halfFreq
@@ -216,20 +223,20 @@ class _FftImagingState extends State<FftImaging> {
                       //plot
                       return Column(
                         children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height *
-                                0.4, //camera ration
-                            child: controller == null
-                                ? const Center(child: Text("Loading Camera..."))
-                                : !controller!.value.isInitialized
-                                    ? const Center(
-                                        child: CircularProgressIndicator(),
-                                      )
-                                    : AspectRatio(
-                                        aspectRatio:
-                                            controller!.value.aspectRatio,
-                                        child: CameraPreview(controller!)),
-                          ),
+                          // SizedBox(
+                          //   height: MediaQuery.of(context).size.height *
+                          //       0.4, //camera ration
+                          //   child: controller == null
+                          //       ? const Center(child: Text("Loading Camera..."))
+                          //       : !controller!.value.isInitialized
+                          //           ? const Center(
+                          //               child: CircularProgressIndicator(),
+                          //             )
+                          //           : AspectRatio(
+                          //               aspectRatio:
+                          //                   controller!.value.aspectRatio,
+                          //               child: CameraPreview(controller!)),
+                          // ),
                           LineChart(
                             LineChartData(
                               minX: 0, // Your min value for x-axis
